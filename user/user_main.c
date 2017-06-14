@@ -330,13 +330,13 @@ admin_recv(void *arg, char *pusrdata, unsigned short len)
 					{
 				    	selfIp[3] = atoi(ptr);
 						espconn_send(arg, "OK\r\n", 4);
-						wifi_set_opmode(STATIONAP_MODE); //Set softAP + station mode
-						wifi_station_dhcpc_stop();
+						//wifi_set_opmode(STATIONAP_MODE); //Set softAP + station mode
+						//wifi_station_dhcpc_stop();
 
-						IP4_ADDR(&info.ip, selfIp[0], selfIp[1], selfIp[2], selfIp[3]);
-						IP4_ADDR(&info.gw, selfIp[0], selfIp[1], selfIp[2], 1);
-						IP4_ADDR(&info.netmask, 255, 255, 255, 0);
-						wifi_set_ip_info(STATION_IF, &info);
+						//IP4_ADDR(&info.ip, selfIp[0], selfIp[1], selfIp[2], selfIp[3]);
+						//IP4_ADDR(&info.gw, selfIp[0], selfIp[1], selfIp[2], 1);
+						//IP4_ADDR(&info.netmask, 255, 255, 255, 0);
+						//wifi_set_ip_info(STATION_IF, &info);
 
 						balanzaFlash.selfIp[0] = selfIp[0];
 						balanzaFlash.selfIp[1] = selfIp[1];
@@ -440,6 +440,14 @@ char setAdcCuenta(int adc)
     unsigned int i;
 	char salida = 0;
 	adcPromedio = 0;
+
+	if (adc > 0x40000)//40000)
+	{
+		adc = (0x80000-adc);
+		adc *= -1;
+		//adc = adc & 0x0007ffff;
+	}
+
 	AdcDatos.vectorPesos[AdcDatos.priv_index_vector_promedios] = adc;
 	AdcDatos.priv_index_vector_promedios++;
 	if(AdcDatos.priv_index_vector_promedios >= AdcDatos.conversiones)//balanzaRam.sizeConversiones)
@@ -462,12 +470,20 @@ char setAdcCuenta(int adc)
 				}
 			}
 		}
+		int negative = 1;
 		if(2*AdcDatos.recortes < AdcDatos.conversiones)//balanzaRam.sizeRecortes < balanzaRam.sizeConversiones)
 		{
 			for(i = AdcDatos.recortes; i < AdcDatos.conversiones-AdcDatos.recortes; i++)//balanzaRam.sizeRecortes; i < balanzaRam.sizeConversiones-balanzaRam.sizeRecortes; i++)
 			{
 				adcPromedio += AdcDatos.vectorPesos[i];
 			}
+
+			if(adcPromedio > 0x80000000)
+			{
+				adcPromedio*=-1;
+				negative = -1;
+			}
+
 			adcPromedio /= (AdcDatos.conversiones-(2*AdcDatos.recortes));//(balanzaRam.sizeConversiones-(2*balanzaRam.sizeRecortes));
 		}
 		else
@@ -476,9 +492,19 @@ char setAdcCuenta(int adc)
 			{
 				adcPromedio += AdcDatos.vectorPesos[i];
 			}
+
+			if(adcPromedio > 0x80000000)
+			{
+				adcPromedio*=-1;
+				negative = -1;
+			}
+
 			adcPromedio /= AdcDatos.conversiones;//(balanzaRam.sizeConversiones);
 		}
+
+		adcPromedio *= negative;
 		AdcDatos.pesoPromediado = adcPromedio;
+		
         salida = 1;
 
 	}
@@ -500,7 +526,7 @@ at_setupCmdStart(uint8_t id, char *pPara)
 	if(setAdcCuenta(adc))
 	{
 		os_sprintf(buffer,"ADC = %d\r\n", AdcDatos.pesoPromediado);
-		//at_port_print(buffer);
+		//at_port_print(buffer); //COMENTAME!
 		espconn_send(&udp_tx_celda, buffer, strlen(buffer));
 	}
 }
