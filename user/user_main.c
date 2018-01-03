@@ -513,7 +513,7 @@ char setAdcCuenta(int adc)
 void ICACHE_FLASH_ATTR
 at_setupCmdStart(uint8_t id, char *pPara)
 {
-    int adc = 0, err = 0, flag = 0;
+    int adc = 0, err = 0, flag = 0,sensor;
     uint8 buffer[100] = {0};
 	char salida;
     pPara++; // skip '='
@@ -521,11 +521,16 @@ at_setupCmdStart(uint8_t id, char *pPara)
     //get the first parameter
     // digit
     flag = at_get_next_int_dec(&pPara, &adc, &err);
+    if (*pPara++ != ',') { // skip ','
+        at_response_error();
+        return;
+    }
+	flag = at_get_next_int_dec(&pPara, &sensor, &err);
 
     // flag must be ture because there are more parameter
 	if(setAdcCuenta(adc))
 	{
-		os_sprintf(buffer,"ADC = %d\r\n", AdcDatos.pesoPromediado);
+		os_sprintf(buffer,"ADC = %d,%d\r\n", AdcDatos.pesoPromediado,sensor);
 		//at_port_print(buffer); //COMENTAME!
 		espconn_send(&udp_tx_celda, buffer, strlen(buffer));
 	}
