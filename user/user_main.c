@@ -715,6 +715,8 @@ user_init(void)
     AdcDatos.recortes = balanzaFlash.recortes;
     AdcDatos.conversiones = balanzaFlash.conversiones;
 
+	wifi_station_set_reconnect_policy(true);
+
     checkIntegrityADCData();
 
 	at_init();
