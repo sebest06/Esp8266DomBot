@@ -8,6 +8,11 @@
 #define PRIV_PARAM_START_SEC  0x3c
 #define PRIV_PARAM_SAVE       0
 
+
+LOCAL os_timer_t scan_time_serv;
+
+LOCAL char b_reset;
+
 /**Conexion TCP Administracion**/
 // Structure holding the TCP connection information.
 LOCAL struct espconn tcp_conn;
@@ -255,7 +260,9 @@ admin_recv(void *arg, char *pusrdata, unsigned short len)
 
 
 						os_memcpy(&stationConf.ssid, bssid, os_strlen(bssid));
+						stationConf.ssid[os_strlen(bssid)] = 0;
 						os_memcpy(&stationConf.password, passw, os_strlen(passw));
+						stationConf.password[os_strlen(passw)] = 0;
 						//os_strcpy(&stationConf.password, passw); 
 
 						os_sprintf(buffer, "%s,%s\r\n", stationConf.ssid,stationConf.password);
@@ -674,6 +681,21 @@ user_rf_pre_init(void)
 {
 }
 
+LOCAL void ICACHE_FLASH_ATTR
+scan_time_callback(void)
+{
+	struct station_config config;
+	char buffer[64];
+	if(b_reset)
+	{
+		system_restart();
+	}
+	//os_sprintf(buffer, "TIME-OUT!%d,%d\r\n", balanzaFlash.channel,station_connected);
+	//at_port_print(buffer);
+	
+}
+
+
 void ICACHE_FLASH_ATTR
 wifi_handle_event_cb(System_Event_t *evt)
 {
@@ -682,7 +704,20 @@ wifi_handle_event_cb(System_Event_t *evt)
      at_port_print(buffer);
 
      switch (evt->event) {
+		case EVENT_STAMODE_DISCONNECTED:
+			if(!b_reset)
+			{
+				os_timer_arm(&scan_time_serv, 15000, 1);//15s
+			}
+			b_reset = TRUE;			
+			//wifi_station_connect();
+		break;
          case EVENT_STAMODE_CONNECTED:
+			if(b_reset)
+			{
+				os_timer_disarm(&scan_time_serv);
+			}
+			b_reset = FALSE;
 /*              os_sprintf(buffer, "connect to ssid %s, channel %d\n",
  	      evt->event_info.connected.ssid, 
  	      evt->event_info.connected.channel);
@@ -691,6 +726,7 @@ wifi_handle_event_cb(System_Event_t *evt)
  	 break;
          case EVENT_STAMODE_GOT_IP:
          case EVENT_SOFTAPMODE_STACONNECTED:
+			  //at_exeStopCelda(1);
               runCeldaAuto();
          break;
 
@@ -706,6 +742,9 @@ user_init(void)
     char buf[64] = {0};
     at_customLinkMax = 1;
 	echoFlag = FALSE;
+
+	b_reset = FALSE;
+
     AdcDatos.priv_index_vector_promedios = 0;
 
     //flasheado salvar;
@@ -714,8 +753,6 @@ user_init(void)
 
     AdcDatos.recortes = balanzaFlash.recortes;
     AdcDatos.conversiones = balanzaFlash.conversiones;
-
-	wifi_station_set_reconnect_policy(true);
 
     checkIntegrityADCData();
 
@@ -737,6 +774,12 @@ user_init(void)
 
     createServerAdm();
     wifi_set_event_handler_cb(wifi_handle_event_cb);
+	wifi_station_set_reconnect_policy(true);
+
+    os_timer_disarm(&scan_time_serv);
+	os_timer_setfn(&scan_time_serv, (os_timer_func_t *)scan_time_callback, NULL);
+	//os_timer_arm(&scan_time_serv, 15000, 1);//15s
+
 //    system_phy_set_max_tpw(1);
 
 }
