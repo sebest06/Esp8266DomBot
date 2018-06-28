@@ -5,7 +5,7 @@
 #include "espconn.h"
 
 
-#define PRIV_PARAM_START_SEC  0x3c
+#define PRIV_PARAM_START_SEC  0xc0
 #define PRIV_PARAM_SAVE       0
 
 
@@ -160,9 +160,9 @@ balanzaFlash.ip[3] = udp_proto_tx_celda.remote_ip[3];
 balanzaFlash.port = udp_proto_tx_celda.remote_port;
 balanzaFlash.configurado = 1;
 
-    spi_flash_erase_sector(PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE);
+    /*spi_flash_erase_sector(PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE);
     spi_flash_write((PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE) * SPI_FLASH_SEC_SIZE,
-        		(uint32 *)&balanzaFlash, sizeof(flasheado));
+        		(uint32 *)&balanzaFlash, sizeof(flasheado));*/
 
 	if(udpRun == 1)
 	{
@@ -183,7 +183,7 @@ balanzaFlash.configurado = 1;
     at_response_ok();
     udpRun = 1;
 // Enable interrupts by GPIO
-    ETS_GPIO_INTR_ENABLE();
+    //ETS_GPIO_INTR_ENABLE();
 
 }
 
@@ -211,9 +211,10 @@ at_param_setup(uint8_t id, char *pPara)
     balanzaFlash.recortes = AdcDatos.recortes;
     balanzaFlash.conversiones = AdcDatos.conversiones;   
     
-    spi_flash_erase_sector(PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE);
+    /*spi_flash_erase_sector(PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE);
     spi_flash_write((PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE) * SPI_FLASH_SEC_SIZE,
         		(uint32 *)&balanzaFlash, sizeof(flasheado));
+	*/
 
 }
 
@@ -294,8 +295,12 @@ admin_recv(void *arg, char *pusrdata, unsigned short len)
 
 						wifi_set_opmode(mode);
 						wifi_softap_set_config(&apConfig);   			
-						system_restart();
+						//system_restart();
                     }
+
+						spi_flash_erase_sector(PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE);
+					    spi_flash_write((PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE) * SPI_FLASH_SEC_SIZE,
+        				(uint32 *)&balanzaFlash, sizeof(flasheado));
                     
                 }
            }
@@ -349,11 +354,9 @@ admin_recv(void *arg, char *pusrdata, unsigned short len)
 						balanzaFlash.selfIp[1] = selfIp[1];
 						balanzaFlash.selfIp[2] = selfIp[2];
 						balanzaFlash.selfIp[3] = selfIp[3];
-    					balanzaFlash.conversiones = AdcDatos.conversiones;   
+    					//balanzaFlash.conversiones = AdcDatos.conversiones;   
     
-    					spi_flash_erase_sector(PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE);
-					    spi_flash_write((PRIV_PARAM_START_SEC + PRIV_PARAM_SAVE) * SPI_FLASH_SEC_SIZE,
-        				(uint32 *)&balanzaFlash, sizeof(flasheado));
+    					
 
 					}
 				}
@@ -686,10 +689,11 @@ scan_time_callback(void)
 {
 	struct station_config config;
 	char buffer[64];
-	if(b_reset)
+/*	if(b_reset)
 	{
 		system_restart();
 	}
+*/
 	//os_sprintf(buffer, "TIME-OUT!%d,%d\r\n", balanzaFlash.channel,station_connected);
 	//at_port_print(buffer);
 	
@@ -705,19 +709,19 @@ wifi_handle_event_cb(System_Event_t *evt)
 
      switch (evt->event) {
 		case EVENT_STAMODE_DISCONNECTED:
-			if(!b_reset)
+			/*if(!b_reset)
 			{
 				os_timer_arm(&scan_time_serv, 15000, 1);//15s
 			}
-			b_reset = TRUE;			
+			b_reset = TRUE;			*/
 			//wifi_station_connect();
 		break;
          case EVENT_STAMODE_CONNECTED:
-			if(b_reset)
+			/*if(b_reset)
 			{
 				os_timer_disarm(&scan_time_serv);
 			}
-			b_reset = FALSE;
+			b_reset = FALSE;*/
 /*              os_sprintf(buffer, "connect to ssid %s, channel %d\n",
  	      evt->event_info.connected.ssid, 
  	      evt->event_info.connected.channel);
@@ -758,7 +762,7 @@ user_init(void)
 
 	at_init();
 
-	wifi_station_dhcpc_stop();
+	//wifi_station_dhcpc_stop();
 
 	IP4_ADDR(&info.ip, balanzaFlash.selfIp[0], balanzaFlash.selfIp[1], balanzaFlash.selfIp[2], balanzaFlash.selfIp[3]);
 	IP4_ADDR(&info.gw, balanzaFlash.selfIp[0], balanzaFlash.selfIp[1], balanzaFlash.selfIp[2], 1);
@@ -766,7 +770,7 @@ user_init(void)
 	wifi_set_ip_info(STATION_IF, &info);
 
     
-    os_sprintf(buf,"compile time:%s %s",__DATE__,__TIME__);
+    os_sprintf(buf,"compile time:%s %s, RECONNECTION POLITY: %d",__DATE__,__TIME__,wifi_station_set_reconnect_policy(true));
     at_set_custom_info(buf);
     at_port_print("\r\nready\r\n");
     
@@ -774,10 +778,10 @@ user_init(void)
 
     createServerAdm();
     wifi_set_event_handler_cb(wifi_handle_event_cb);
-	wifi_station_set_reconnect_policy(true);
+	
 
-    os_timer_disarm(&scan_time_serv);
-	os_timer_setfn(&scan_time_serv, (os_timer_func_t *)scan_time_callback, NULL);
+    //os_timer_disarm(&scan_time_serv);
+	//os_timer_setfn(&scan_time_serv, (os_timer_func_t *)scan_time_callback, NULL);
 	//os_timer_arm(&scan_time_serv, 15000, 1);//15s
 
 //    system_phy_set_max_tpw(1);
